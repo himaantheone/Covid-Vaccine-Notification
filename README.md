@@ -1,4 +1,4 @@
-# Covid-Notification
+# Covid-Vaccine-Notification
 
 Window App to notify you when covid vaccines slots are available in your pincode.
 
