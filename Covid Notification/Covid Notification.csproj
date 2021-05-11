@@ -5,6 +5,7 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>Covid_Notification</RootNamespace>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Vaccine_Icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
