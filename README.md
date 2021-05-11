@@ -10,4 +10,7 @@ Select Age
 
 Enter Interval in mins to check 
 
+Click Recieve Notification and you are done.
+
+
 
