@@ -14,3 +14,4 @@ Click Recieve Notification and you are done.
 
 
 
+Download Exe File - shorturl.at/rsSW6
