@@ -31,29 +31,36 @@ namespace Covid_Notification
 
         private void button1_Click(object sender, EventArgs e)
         {
-            if (timer1.Enabled)
+            try
             {
-                timer1.Stop();
-                timer1.Dispose();
+                if (timer1.Enabled)
+                {
+                    timer1.Stop();
+                    timer1.Dispose();
+                }
+                var success = true;
+                foreach (Control c in this.Controls)
+                {
+                    if (!string.IsNullOrWhiteSpace(errorProvider1.GetError(c)) || !string.IsNullOrEmpty(errorProvider2.GetError(c)))
+                        success = false;
+                }
+                if (success)
+                {
+                    int minutes = 0;
+                    int.TryParse(textBox2.Text, out minutes);
+                    timer1.Interval = minutes == 0 ? (int)TimeSpan.FromMinutes(5).TotalMilliseconds : (int)TimeSpan.FromMinutes(minutes).TotalMilliseconds;
+                    timer1.Enabled = true;
+                    var responses = GetData(comboBox1.SelectedIndex, textBox1.Text);
+                    var createmssg = CreateMessage(responses);
+                    if (!string.IsNullOrWhiteSpace(createmssg.mssg))
+                        this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
+                    else
+                        this.Alert($"No slots open currently will search in background every {textBox2.Text} minutes and send notification only when slots are available", 0, Form_Alert.enmType.Warning);
+                }
             }
-            var success = true;
-            foreach (Control c in this.Controls)
+            catch(Exception ex)
             {
-                if (!string.IsNullOrWhiteSpace(errorProvider1.GetError(c)) || !string.IsNullOrEmpty(errorProvider2.GetError(c)))
-                    success = false;
-            }
-            if (success)
-            {
-                int minutes = 0;
-                int.TryParse(textBox2.Text, out minutes);
-                timer1.Interval = minutes == 0 ? (int)TimeSpan.FromMinutes(5).TotalMilliseconds : (int)TimeSpan.FromMinutes(minutes).TotalMilliseconds; 
-                timer1.Enabled = true;
-                var responses = GetData(comboBox1.SelectedIndex, textBox1.Text);
-                var createmssg = CreateMessage(responses);
-                if (!string.IsNullOrWhiteSpace(createmssg.mssg))
-                    this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
-                else
-                    this.Alert($"No slots open currently will search in background every {textBox2.Text} minutes and send notification only when slots are available", 0, Form_Alert.enmType.Warning);
+                this.Close();
             }
         }
 
