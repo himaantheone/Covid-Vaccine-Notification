@@ -1,4 +1,6 @@
-﻿using Newtonsoft.Json;
+﻿using Covid_Notification.Models;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -7,6 +9,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Covid_Notification
@@ -14,6 +17,9 @@ namespace Covid_Notification
     public partial class Form1 : Form
     {
         private readonly HttpClient _httpClient;
+        private static IEnumerable<StateModel> states;
+        private int tabIndex;
+        private int district;
         public Form1()
         {
             InitializeComponent();
@@ -27,7 +33,7 @@ namespace Covid_Notification
             else
                 errorProvider1.SetError(textBox1, "");
         }
-       
+
 
         private void button1_Click(object sender, EventArgs e)
         {
@@ -38,6 +44,8 @@ namespace Covid_Notification
                     timer1.Stop();
                     timer1.Dispose();
                 }
+
+
                 var success = true;
                 foreach (Control c in this.Controls)
                 {
@@ -46,19 +54,35 @@ namespace Covid_Notification
                 }
                 if (success)
                 {
+                    tabIndex = tabControl1.SelectedIndex;
+                    district = ((CityModel)cityDropdown.SelectedItem).District_id;
                     int minutes = 0;
                     int.TryParse(textBox2.Text, out minutes);
                     timer1.Interval = minutes == 0 ? (int)TimeSpan.FromMinutes(5).TotalMilliseconds : (int)TimeSpan.FromMinutes(minutes).TotalMilliseconds;
                     timer1.Enabled = true;
-                    var responses = GetData(comboBox1.SelectedIndex, textBox1.Text);
-                    var createmssg = CreateMessage(responses);
-                    if (!string.IsNullOrWhiteSpace(createmssg.mssg))
-                        this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
-                    else
-                        this.Alert($"No slots open currently will search in background every {textBox2.Text} minutes and send notification only when slots are available", 0, Form_Alert.enmType.Warning);
+                    if (tabControl1.SelectedIndex == 1)
+                    {
+                        var responses = GetData(comboBox1.SelectedIndex, textBox1.Text);
+                        var createmssg = CreateMessage(responses);
+                        if (!string.IsNullOrWhiteSpace(createmssg.mssg))
+                            this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
+                        else
+                            this.Alert($"No slots open currently will search in background every {textBox2.Text} minutes and send notification only when slots are available", 0, Form_Alert.enmType.Warning);
+                    }
+                    else if (tabControl1.SelectedIndex == 0)
+                    {
+                        var responses = GetData(comboBox1.SelectedIndex, textBox1.Text, district);
+                        var createmssg = CreateMessage(responses);
+                        if (!string.IsNullOrWhiteSpace(createmssg.mssg))
+                            this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
+                        else
+                            this.Alert($"No slots open currently will search in background every {textBox2.Text} minutes and send notification only when slots are available", 0, Form_Alert.enmType.Warning);
+                    }
                 }
+
+
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 this.Close();
             }
@@ -96,37 +120,33 @@ namespace Covid_Notification
             mssgObj.mssg = createmssg?.ToString();
             return mssgObj;
         }
-        private  IEnumerable<CovidResponseModel> GetData(int index, string pincode)
-        {
 
-            // need to change this to a recursive function with option of next days added in form in next update.
-            var presentDate = DateTime.UtcNow.ToString("dd-MM-yyyy");
-            var url = $"https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByPin?pincode={pincode}&date={presentDate}";
+        private IEnumerable<CovidResponseModel> GetRecursiveData(int ageIndex, string pincode, int days, int? district)
+        {
+            var presentDate = DateTime.UtcNow.AddDays(days).ToString("dd-MM-yyyy");
+            var url = district!=null ? $"https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByDistrict?district_id={district}&date={presentDate}": $"https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByPin?pincode={pincode}&date={presentDate}";
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(@$"{url}");
             HttpWebResponse response = (HttpWebResponse)request.GetResponse();
             var content = new StreamReader(response.GetResponseStream());
-            var resultData = JsonConvert.DeserializeObject< dynamic>(content.ReadToEnd());
+            var resultData = JsonConvert.DeserializeObject<dynamic>(content.ReadToEnd());
             IEnumerable<CovidResponseModel> covidData = Enumerable.Empty<CovidResponseModel>();
-
-            var next7DayDate = DateTime.UtcNow.AddDays(7).ToString("dd-MM-yyyy");
-            var url7days = $"https://cdn-api.co-vin.in/api/v2/appointment/sessions/public/calendarByPin?pincode={pincode}&date={next7DayDate}";
-            HttpWebRequest request7day = (HttpWebRequest)WebRequest.Create(@$"{url7days}");
-            HttpWebResponse responseNext7Day = (HttpWebResponse)request7day.GetResponse();
-            var contentNext7Day = new StreamReader(responseNext7Day.GetResponseStream());
-            var resultDatanext7Day = JsonConvert.DeserializeObject<dynamic>(contentNext7Day.ReadToEnd());
-            IEnumerable<CovidResponseModel> covidDatanext7Day = Enumerable.Empty<CovidResponseModel>();
-
-            if (!(response.StatusCode == HttpStatusCode.OK) || !(responseNext7Day.StatusCode == HttpStatusCode.OK))
+            if (!(response.StatusCode == HttpStatusCode.OK))
                 return covidData;
-
             covidData = resultData.centers.ToObject<IEnumerable<CovidResponseModel>>();
-            covidDatanext7Day = resultDatanext7Day.centers.ToObject<IEnumerable<CovidResponseModel>>();
-
-            var concatenateCovidData = covidData.Concat(covidDatanext7Day);
-            if (index == 0)
-                return concatenateCovidData.Where(x => x.Sessions.Any(y => y.Min_age_limit == 18) && x.Sessions.Any(y => y.Available_capacity > 0));
+            if (ageIndex == 0)
+                return covidData.Where(x => x.Sessions.Any(y => y.Min_age_limit == 18) && x.Sessions.Any(y => y.Available_capacity > 0));
             else
-                return concatenateCovidData.Where(x => x.Sessions.Any(y => y.Available_capacity > 0));
+                return covidData.Where(x => x.Sessions.Any(y => y.Available_capacity > 0));
+        }
+
+        private  List<CovidResponseModel> GetData(int index, string pincode, int? district = null)
+        {
+            List<CovidResponseModel> covidData = new List<CovidResponseModel>();
+            for (int i = 0; i < 28; i+=7)
+            {
+                covidData.AddRange(GetRecursiveData(index, pincode, i, district));
+            }
+            return covidData;
         }
 
         private void textBox1_KeyPress(object sender, KeyPressEventArgs e)
@@ -139,18 +159,42 @@ namespace Covid_Notification
             }
         }
 
-        private void Form1_Load(object sender, EventArgs e)
+        private async void Form1_Load(object sender, EventArgs e)
         {
             comboBox1.SelectedIndex = 0;
+            states = await loadStates();
+            stateDropdown.DataSource = states;
+            stateDropdown.ValueMember = "State_id";
+            stateDropdown.DisplayMember = "State_name";
+        }
+
+        private async Task<IEnumerable<StateModel>> loadStates()
+        {
+            HttpResponseMessage response = await _httpClient.GetAsync("https://cdn-api.co-vin.in/api/v2/admin/location/states").ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            dynamic data = JObject.Parse(responseBody);
+            var resultData = data.states.ToObject<IEnumerable<StateModel>>();
+            return resultData;
+            
         }
 
         private  void timer1_Tick(object sender, EventArgs e)
         {
-            var responses = GetData(comboBox1.SelectedIndex, textBox1.Text);
-            var createmssg = CreateMessage(responses);
-            if (!string.IsNullOrWhiteSpace(createmssg.mssg))
-                this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
-          
+            if (tabIndex == 1)
+            {
+                var responses = GetData(comboBox1.SelectedIndex, textBox1.Text);
+                var createmssg = CreateMessage(responses);
+                if (!string.IsNullOrWhiteSpace(createmssg.mssg))
+                    this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
+            }
+            else if(tabIndex == 0)
+            {
+                var responses = GetData(comboBox1.SelectedIndex, textBox1.Text, district);
+                var createmssg = CreateMessage(responses);
+                if (!string.IsNullOrWhiteSpace(createmssg.mssg))
+                    this.Alert(createmssg.mssg, createmssg.totalCount, Form_Alert.enmType.Success);
+            }
                
         }
 
@@ -213,5 +257,24 @@ namespace Covid_Notification
             this.Visible = true;
             this.Show();
         }
+
+        private async void stateDropdown_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            var cities = await GetCities(((StateModel)stateDropdown.SelectedItem).State_id);
+            cityDropdown.DataSource = cities;
+            cityDropdown.ValueMember = "District_id";
+            cityDropdown.DisplayMember = "District_name";
+        }
+
+        private async Task<IEnumerable<CityModel>> GetCities(int stateId)
+        {
+            HttpResponseMessage response = await _httpClient.GetAsync($"https://cdn-api.co-vin.in/api/v2/admin/location/districts/{stateId}").ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            string responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            dynamic data = JObject.Parse(responseBody);
+            var resultData = data.districts.ToObject<IEnumerable<CityModel>>();
+            return resultData;
+        }
+
     }
 }
