@@ -16,6 +16,6 @@ Click Recieve Notification and you are done.
 
 Download Exe File - 
 
-[v2(Latest)](shorturl.at/dBGX7)
+[v2(Latest)](https://www.shorturl.at/dBGX7)
 
-[v1](https://www.quora.com)
+[v1](https://www.shorturl.at/rsSW6)
