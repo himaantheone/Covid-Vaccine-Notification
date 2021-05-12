@@ -18,4 +18,4 @@ Download Exe File -
 
 [v2(Latest)](shorturl.at/dBGX7)
 
-[v1](shorturl.at/rsSW6)
+[v1](https://www.quora.com)
